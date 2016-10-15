@@ -9,6 +9,8 @@ Usage of ./multi-tail:
       port to ssh (default "22")
   -login_user string
       username to ssh login (default "user")
+  -only_new_line
+      only print new lines appended after current log file (default true)
   -remote_address value
       remote address including port, eg. foo.com:22, may be given multiple times
   -remote_user string
