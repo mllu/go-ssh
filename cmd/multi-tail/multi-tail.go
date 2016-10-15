@@ -13,7 +13,7 @@ import (
 	gs "github.com/mllu/go-ssh"
 )
 
-func TailLog(name, logFile string, client *ssh.Client, lines chan<- string) {
+func TailLog(name, logFile string, onlyNewLine bool, client *ssh.Client, lines chan<- string) {
 	sess, _ := client.NewSession()
 	defer sess.Close()
 
@@ -24,14 +24,19 @@ func TailLog(name, logFile string, client *ssh.Client, lines chan<- string) {
 
 	sess.Start("tail -f " + logFile)
 
+	lineCnt := 1
 	for scanner.Scan() {
+		if onlyNewLine && lineCnt <= 10 {
+			lineCnt++
+			continue
+		}
 		lines <- fmt.Sprintf("[%s] %s", name, scanner.Text())
 	}
 
 	sess.Wait()
 }
 
-func MultiTail(bastion *ssh.Client, remoteAddrs []string, remoteUser, logFile string) {
+func MultiTail(bastion *ssh.Client, remoteAddrs []string, remoteUser, logFile string, onlyNewLine bool) {
 	usr, _ := user.Current()
 	lines := make(chan string)
 	for _, remote := range remoteAddrs {
@@ -57,6 +62,7 @@ func MultiTail(bastion *ssh.Client, remoteAddrs []string, remoteUser, logFile st
 		go TailLog(
 			remote,
 			logFile,
+			onlyNewLine,
 			gs.Proxy(bastion, remote, cfg),
 			lines,
 		)
@@ -83,6 +89,7 @@ func main() {
 	sc := gs.NewConfig()
 	remoteHosts := StringArray{}
 	logFile := flag.String("log_file", "", "full path for log file to tail")
+	onlyNewLine := flag.Bool("only_new_line", true, "only print new lines appended after current log file")
 	flag.Var(&remoteHosts, "remote_address",
 		"remote address including port, eg. foo.com:22, may be given multiple times")
 	remoteUser := flag.String("remote_user", usr.Username, "username to login to remote hosts")
@@ -94,5 +101,5 @@ func main() {
 	}
 	defer cli.Close()
 	hosts := strings.Split(remoteHosts.String(), ",")
-	MultiTail(cli, hosts, *remoteUser, *logFile)
+	MultiTail(cli, hosts, *remoteUser, *logFile, *onlyNewLine)
 }
