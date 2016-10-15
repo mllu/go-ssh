@@ -1,0 +1,18 @@
+Usage of ./multi-tail:
+  -key_file string
+      location of private key (default "/home/user/.ssh/id_rsa")
+  -log_file string
+      full path for log file to tail
+  -login_host string
+      hostname to ssh (default "localhost")
+  -login_port string
+      port to ssh (default "22")
+  -login_user string
+      username to ssh login (default "user")
+  -remote_address value
+      remote address including port, eg. foo.com:22, may be given multiple times
+  -remote_user string
+      username to login to remote hosts (default "user")
+
+Sample usage:
+./multi-tail -login_host="example.com" -log_file=/var/log/sys.log -remote_address=foo:22 -remote_address=bar:22 -remote_user=admin
