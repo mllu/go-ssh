@@ -1,0 +1,38 @@
+This repo leverage golang built-in ssh to implement the following tools:
+
+$ git clone git@github.com:mllu/go-ssh.git
+$ cd go-ssh
+
+ssh
+  how to use?
+  $ cd cmd/ssh; go build;
+  Usage of ./ssh:
+    -cmd string
+        command to execute on remote server (default "pwd")
+    -key_file string
+        location of private key (default "/Users/user/.ssh/id_rsa")
+    -login_host string
+        hostname to ssh (default "localhost")
+    -login_port string
+        port to ssh (default "22")
+    -login_user string
+        username to ssh login (default "user")
+
+shell
+  how to use?
+  $ cd cmd/shell; go build;
+  Usage of ./shell:
+    -key_file string
+        location of private key (default "/Users/user/.ssh/id_rsa")
+    -login_host string
+        hostname to ssh (default "localhost")
+    -login_port string
+        port to ssh (default "22")
+    -login_user string
+        username to ssh login (default "user")
+
+multi-tail
+  how to use?
+  $ cd cmd/multi-tail; go build;
+  please refer to cmd/multi-tail/README for more info
+
