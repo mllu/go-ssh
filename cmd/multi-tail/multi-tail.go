@@ -17,7 +17,11 @@ func TailLog(name, logFile string, onlyNewLine bool, client *ssh.Client, lines c
 	sess, _ := client.NewSession()
 	defer sess.Close()
 
-	out, _ := sess.StdoutPipe()
+	out, err := sess.StdoutPipe()
+	if err != nil {
+		log.Printf("Unable to setup stdout for session: %v", err)
+		return
+	}
 
 	scanner := bufio.NewScanner(out)
 	scanner.Split(bufio.ScanLines)
