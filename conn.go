@@ -1,9 +1,12 @@
 package gossh
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -103,4 +106,32 @@ func Proxy(bastion *ssh.Client, addr string, cliCfg *ssh.ClientConfig) *ssh.Clie
 	netConn, _ := bastion.Dial("tcp", addr)
 	conn, chans, reqs, _ := ssh.NewClientConn(netConn, addr, cliCfg)
 	return ssh.NewClient(conn, chans, reqs)
+}
+
+func GetMultiCliConfig(remoteAddrs []string, remoteUser string) ([]*ssh.ClientConfig, error) {
+	cfgs := []*ssh.ClientConfig{}
+	usr, _ := user.Current()
+	for _, remote := range remoteAddrs {
+		part := strings.Split(remote, ":")
+		if len(part) != 2 {
+			return nil, fmt.Errorf("malformed remoteAddrs %s", remote)
+		}
+		host, port := part[0], part[1]
+		sc := &SSHConfig{
+			User:    remoteUser,
+			Host:    host,
+			Port:    port,
+			KeyFile: usr.HomeDir + "/.ssh/id_rsa",
+		}
+		auths, err := sc.GetAuthMethods()
+		if err != nil {
+			return nil, err
+		}
+		cfg := &ssh.ClientConfig{
+			User: sc.User,
+			Auth: auths,
+		}
+		cfgs = append(cfgs, cfg)
+	}
+	return cfgs, nil
 }

@@ -5,8 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"os/user"
 	"strings"
+	"syscall"
 
 	"golang.org/x/crypto/ssh"
 
@@ -40,40 +43,49 @@ func TailLog(name, logFile string, onlyNewLine bool, client *ssh.Client, lines c
 	sess.Wait()
 }
 
-func MultiTail(bastion *ssh.Client, remoteAddrs []string, remoteUser, logFile string, onlyNewLine bool) {
-	usr, _ := user.Current()
+func MultiTail(bastion *ssh.Client, remoteAddrs []string, remoteUser, logFile string, onlyNewLine bool, done chan bool) {
 	lines := make(chan string)
-	for _, remote := range remoteAddrs {
-		part := strings.Split(remote, ":")
-		if len(part) != 2 {
-			return
-		}
-		host, port := part[0], part[1]
-		sc := &gs.SSHConfig{
-			User:    remoteUser,
-			Host:    host,
-			Port:    port,
-			KeyFile: usr.HomeDir + "/.ssh/id_rsa",
-		}
-		auths, err := sc.GetAuthMethods()
-		if err != nil {
-			log.Fatal(err)
-		}
-		cfg := &ssh.ClientConfig{
-			User: sc.User,
-			Auth: auths,
-		}
+	defer close(lines)
+	termChan := make(chan os.Signal, 1)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+
+	cfgs, err := gs.GetMultiCliConfig(remoteAddrs, remoteUser)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	clients := []*ssh.Client{}
+	for i, remote := range remoteAddrs {
+		clients = append(clients, gs.Proxy(bastion, remote, cfgs[i]))
+	}
+
+	for i, remote := range remoteAddrs {
 		go TailLog(
 			remote,
 			logFile,
 			onlyNewLine,
-			gs.Proxy(bastion, remote, cfg),
+			clients[i],
 			lines,
 		)
 	}
 
-	for l := range lines {
-		log.Print(l)
+	for {
+		select {
+		case l := <-lines:
+			log.Print(l)
+		case sigTerm := <-termChan:
+			log.Printf("signal %d received, process tail terminated on remote servers", sigTerm)
+			for _, cli := range clients {
+				sess, _ := cli.NewSession()
+				err := sess.Run("pkill tail")
+				if err != nil {
+					log.Println(err)
+				}
+				sess.Close()
+			}
+			return
+		}
 	}
 }
 
@@ -89,6 +101,7 @@ func (a *StringArray) String() string {
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	usr, _ := user.Current()
 	sc := gs.NewConfig()
 	remoteHosts := StringArray{}
@@ -104,6 +117,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer cli.Close()
+
+	done := make(chan bool)
 	hosts := strings.Split(remoteHosts.String(), ",")
-	MultiTail(cli, hosts, *remoteUser, *logFile, *onlyNewLine)
+	MultiTail(cli, hosts, *remoteUser, *logFile, *onlyNewLine, done)
 }
